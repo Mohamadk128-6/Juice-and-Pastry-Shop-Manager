@@ -1,0 +1,43 @@
+name: shop_manager
+description: Juice & Pastry Shop Manager App
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+
+  flutter_localizations:
+    sdk: flutter
+  flutter:
+    sdk: flutter
+
+  # UI + helpers
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+
+  # State management
+  provider: ^6.1.2
+
+  # Firebase for realtime sync
+  firebase_core: ^2.12.0
+  cloud_firestore: ^4.9.0
+  firebase_auth: ^4.7.0
+  # Local storage (offline)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Charts & analytics
+  syncfusion_flutter_charts: ^30.2.6
+  syncfusion_flutter_core: ^30.2.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
