@@ -167,24 +167,26 @@ class BankScreen extends StatelessWidget {
             ),
           ),
           actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                TextButton(
-                  onPressed: () {
-                    final name = nameCtrl.text.trim();
-                    final price = double.tryParse(priceCtrl.text) ?? 0.0;
-                    final stock = int.tryParse(stockCtrl.text) ?? 0;
-                    if (name.isNotEmpty && price > 0) {
-                      context.read<ProductsFirestoreProvider>().addProduct(
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                final price = double.tryParse(priceCtrl.text) ?? 0.0;
+                final stock = int.tryParse(stockCtrl.text) ?? 0;
+                if (name.isNotEmpty && price > 0) {
+                  context.read<ProductsFirestoreProvider>().addProduct(
                         category: cat,
                         name: name,
                         priceUsd: price,
                         initialStock: stock,
                       );
-                      Navigator.pop(ctx);
-                    }
-                  },
-                  child: const Text('Add'),
-                ),
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Add'),
+            ),
           ],
         );
       },
@@ -221,21 +223,20 @@ class BankScreen extends StatelessWidget {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancel')),
             TextButton(
-                onPressed: () {
-                  final newStock = int.tryParse(stockCtrl.text) ?? p.stock;
-                  final newPrice =
-                      double.tryParse(priceCtrl.text) ?? p.priceUsd;
-                  if (newStock != p.stock) {
-                    context
-                        .read<ProductsFirestoreProvider>()
-                        .updateStock(p.id, newStock);
-                  }
-                  if (newPrice != p.priceUsd) {
-                    // Price editing can be added when the provider supports it.
-                  }
-                  Navigator.pop(ctx);
-                },
-                child: const Text('Save'),
+              onPressed: () {
+                final newStock = int.tryParse(stockCtrl.text) ?? p.stock;
+                final newPrice = double.tryParse(priceCtrl.text) ?? p.priceUsd;
+                if (newStock != p.stock) {
+                  context
+                      .read<ProductsFirestoreProvider>()
+                      .updateStock(p.id, newStock);
+                }
+                if (newPrice != p.priceUsd) {
+                  // Price editing can be added when the provider supports it.
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Save'),
             ),
           ],
         );

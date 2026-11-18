@@ -20,6 +20,7 @@ class ProductsFirestoreProvider extends ChangeNotifier {
       _items.clear();
       for (var doc in snap.docs) {
         final data = doc.data();
+        if (data['type'] != null) continue;
         final catStr = (data['category'] ?? 'juices') as String;
         final category = models.Category.values.firstWhere(
             (c) => c.toString().split('.').last == catStr,

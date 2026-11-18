@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/sales_firestore_provider.dart';
+import '../providers/reliable_sales_provider.dart';
 import '../src/app_lang.dart';
 import 'transaction_detail_screen.dart';
 
@@ -49,7 +49,7 @@ class DailySalesScreen extends StatelessWidget {
                           elevation: 0,
                           child: ListTile(
                             title: Text('Transaction ${i + 1}'),
-                            subtitle: Text('$hh:$mm'),
+                            subtitle: Text('$hh:$mm • ${t.workerName}'),
                             trailing: Text(
                               '\$${t.totalUsd.toStringAsFixed(2)}',
                               style:

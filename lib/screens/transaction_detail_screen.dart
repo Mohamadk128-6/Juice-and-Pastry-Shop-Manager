@@ -29,6 +29,14 @@ class TransactionDetailScreen extends StatelessWidget {
           children: [
             Text('Total: \$${transaction.totalUsd.toStringAsFixed(2)}'),
             Text('LBP ${transaction.totalLbp.toStringAsFixed(0)}'),
+            const SizedBox(height: 8),
+            Text(lang == AppLang.ar
+                ? 'سجله العامل: ${transaction.workerName}'
+                : 'Recorded by: ${transaction.workerName}'),
+            if (transaction.orderNote.isNotEmpty)
+              Text(lang == AppLang.ar
+                  ? 'ملاحظة: ${transaction.orderNote}'
+                  : 'Note: ${transaction.orderNote}'),
             const SizedBox(height: 16),
             Expanded(
               child: ListView.separated(

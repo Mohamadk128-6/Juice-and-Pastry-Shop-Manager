@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'providers/products_firestore_provider.dart';
-import 'providers/sales_firestore_provider.dart';
-import 'screens/products_screen.dart';
+import 'providers/menu_products_firestore_provider.dart';
+import 'providers/reliable_sales_provider.dart';
+import 'providers/worker_session_provider.dart';
+import 'screens/menu_management_screen.dart';
 import 'screens/new_sale_screen.dart';
 import 'screens/daily_sales_screen.dart';
 import 'screens/transaction_detail_screen.dart';
@@ -13,27 +16,123 @@ import 'src/app_lang.dart';
 import 'widgets/animated_background.dart';
 import 'services/firebase_service.dart';
 import 'services/firebase_auth_service.dart';
+import 'services/local_backup_service.dart';
 import 'widgets/app_drawer.dart';
+import 'widgets/sync_status_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // initialize Firebase and sign in anonymously (best-effort)
-  await FirebaseService().init().catchError((_) {});
+  await Hive.initFlutter();
+  await Hive.openBox('shop_manager_settings');
+  await LocalBackupService.init();
+
+  await _startApplication();
+}
+
+Future<void> _startApplication() async {
   try {
-    // try anonymous sign-in; ignore failure for local dev
-    await FirebaseAuthService().signInAnonymously();
+    // Firebase Core must be ready before any Firestore-backed provider is
+    // created. Creating those providers first causes [core/no-app].
+    await FirebaseService().init();
+  } catch (error) {
+    runApp(_FirebaseStartupError(error: error));
+    return;
+  }
+
+  // Authentication is needed by the Firestore security rules. A failed
+  // network request must not prevent the app from opening; Firebase Auth can
+  // restore a previously signed-in anonymous user when it is available.
+  try {
+    await FirebaseAuthService()
+        .signInAnonymously()
+        .timeout(const Duration(seconds: 10));
   } catch (_) {}
 
-  runApp(
-    MultiProvider(
+  runApp(_buildProviders());
+}
+
+Widget _buildProviders() => MultiProvider(
       providers: [
-        // Firestore-backed providers for realtime sync (primary)
         ChangeNotifierProvider(create: (_) => ProductsFirestoreProvider()),
+        ChangeNotifierProvider(create: (_) => MenuProductsFirestoreProvider()),
         ChangeNotifierProvider(create: (_) => SalesFirestoreProvider()),
+        ChangeNotifierProvider(create: (_) => WorkerSessionProvider()),
       ],
       child: const ShopManagerApp(),
-    ),
-  );
+    );
+
+class _FirebaseStartupError extends StatefulWidget {
+  final Object error;
+
+  const _FirebaseStartupError({required this.error});
+
+  @override
+  State<_FirebaseStartupError> createState() => _FirebaseStartupErrorState();
+}
+
+class _FirebaseStartupErrorState extends State<_FirebaseStartupError> {
+  bool _retrying = false;
+
+  Future<void> _retry() async {
+    if (_retrying) return;
+    setState(() => _retrying = true);
+    try {
+      await FirebaseService().init();
+      try {
+        await FirebaseAuthService()
+            .signInAnonymously()
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {}
+      runApp(_buildProviders());
+    } catch (_) {
+      if (mounted) setState(() => _retrying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cloud_off, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'تعذّر الاتصال بـ Firebase',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'تأكد من الإنترنت ثم حاول مرة أخرى.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _retrying ? null : _retry,
+                    icon: _retrying
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label:
+                        Text(_retrying ? 'جاري الاتصال...' : 'إعادة المحاولة'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// --------------------
@@ -53,10 +152,13 @@ class T {
   static const _en = {
     'dashboard': 'Dashboard',
     'totalRevenue': 'Total Revenue',
+    'todayRevenue': 'Today\'s Sales',
     'exchangeRate': 'Exchange rate',
     'newSale': 'New Sale',
     'products': 'Products',
     'recentSales': 'Recent Sales',
+    'viewAll': 'View all',
+    'noSalesToday': 'No sales today',
     'today': 'Today',
     'empty': 'No sales yet',
     'statistics': 'Statistics',
@@ -68,10 +170,13 @@ class T {
   static const _ar = {
     'dashboard': 'لوحة التحكم',
     'totalRevenue': 'إجمالي المبيعات',
+    'todayRevenue': 'مبيعات اليوم',
     'exchangeRate': 'سعر الصرف',
     'newSale': 'عملية بيع',
     'products': 'المنتجات',
     'recentSales': 'آخر المبيعات',
+    'viewAll': 'عرض الكل',
+    'noSalesToday': 'لا توجد مبيعات اليوم',
     'today': 'اليوم',
     'empty': 'لا يوجد مبيعات بعد',
     'statistics': 'الإحصائيات',
@@ -108,7 +213,7 @@ class _ShopManagerAppState extends State<ShopManagerApp> {
         _lang == AppLang.ar ? const Locale('ar') : const Locale('en');
 
     return MaterialApp(
-      title: 'Shop Manager',
+      title: 'Sweet Sip',
       debugShowCheckedModeBanner: false,
       locale: locale,
       supportedLocales: const [
@@ -123,11 +228,20 @@ class _ShopManagerAppState extends State<ShopManagerApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        scaffoldBackgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: const Color(0xFFFFF8ED),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Color(0xFF1B160D),
+          foregroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+          iconTheme: IconThemeData(color: Colors.white),
+          actionsIconTheme: IconThemeData(color: Colors.white),
         ),
         cardTheme: CardThemeData(
           color: const Color.fromRGBO(255, 255, 255, 0.92),
@@ -178,10 +292,23 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final sales = context.watch<SalesFirestoreProvider>();
 
-    final totalUsd = sales.totalUsdAll;
-    final totalLbp = totalUsd * exchangeRate;
-
-    final recentTx = sales.recentTransactions;
+    final now = DateTime.now();
+    bool isToday(DateTime value) =>
+        value.year == now.year &&
+        value.month == now.month &&
+        value.day == now.day;
+    final todayTransactions = sales.allTransactions
+        .where((transaction) => isToday(transaction.createdAt))
+        .toList(growable: false);
+    final totalUsd = todayTransactions.fold<double>(
+      0,
+      (total, transaction) => total + transaction.totalUsd,
+    );
+    final totalLbp = todayTransactions.fold<double>(
+      0,
+      (total, transaction) => total + transaction.totalLbp,
+    );
+    final recentTx = todayTransactions.take(5).toList(growable: false);
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -191,9 +318,15 @@ class DashboardScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: onToggleLang,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFF4B942),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             child: Text(
               lang == AppLang.en ? 'AR' : 'EN',
-              style: TextStyle(color: Theme.of(context).colorScheme.primary),
             ),
           ),
           const SizedBox(width: 8),
@@ -206,8 +339,10 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                const SyncStatusBanner(compact: true),
+                const SizedBox(height: 10),
                 _RevenueCard(
-                  title: T.of(lang, 'totalRevenue'),
+                  title: T.of(lang, 'todayRevenue'),
                   usdText: formatUSD(totalUsd),
                   lbpText: formatLBP(totalLbp),
                   subtitle:
@@ -246,7 +381,7 @@ class DashboardScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ProductsScreen(
+                              builder: (_) => MenuManagementScreen(
                                 lang: lang == AppLang.ar
                                     ? AppLang.ar
                                     : AppLang.en,
@@ -261,30 +396,35 @@ class DashboardScreen extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // Recent sales title (tap to view full day list)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const DailySalesScreen()),
-                      );
-                    },
-                    child: Text(
-                      T.of(lang, 'recentSales'),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        T.of(lang, 'recentSales'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const DailySalesScreen()),
+                        );
+                      },
+                      child: Text(T.of(lang, 'viewAll')),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
 
                 // Recent transactions list
                 Expanded(
                   child: recentTx.isEmpty
-                      ? Center(child: Text(T.of(lang, 'empty')))
+                      ? Center(child: Text(T.of(lang, 'noSalesToday')))
                       : ListView.separated(
                           itemCount: recentTx.length,
                           separatorBuilder: (_, __) =>
@@ -301,8 +441,19 @@ class DashboardScreen extends StatelessWidget {
                                 leading: const CircleAvatar(
                                   child: Icon(Icons.receipt_long),
                                 ),
-                                title: Text('Transaction ${i + 1}'),
-                                subtitle: Text('$hh:$mm'),
+                                title: Text(
+                                  tx.workerName.isEmpty ||
+                                          tx.workerName == 'غير محدد'
+                                      ? (lang == AppLang.ar
+                                          ? 'طلب جديد'
+                                          : 'Order')
+                                      : tx.workerName,
+                                ),
+                                subtitle: Text(
+                                  lang == AppLang.ar
+                                      ? '$hh:$mm • ${tx.items.length} أصناف'
+                                      : '$hh:$mm • ${tx.items.length} items',
+                                ),
                                 trailing: Text(
                                   '\$${tx.totalUsd.toStringAsFixed(2)}',
                                   style: const TextStyle(

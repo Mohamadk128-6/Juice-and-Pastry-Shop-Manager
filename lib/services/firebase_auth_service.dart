@@ -5,9 +5,10 @@ class FirebaseAuthService {
   factory FirebaseAuthService() => _instance;
   FirebaseAuthService._internal();
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
 
   Future<User?> signInAnonymously() async {
+    if (_auth.currentUser != null) return _auth.currentUser;
     try {
       final cred = await _auth.signInAnonymously();
       return cred.user;

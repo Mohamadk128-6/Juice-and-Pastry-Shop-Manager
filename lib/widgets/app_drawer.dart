@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../screens/daily_sales_screen.dart';
 import '../screens/statistics_screen.dart';
-import '../screens/bank_screen.dart';
+import '../screens/owner_orders_screen.dart';
+import '../screens/smart_suggestions_screen.dart';
 import '../src/app_lang.dart';
 import '../main.dart';
 
@@ -15,7 +16,6 @@ class AppDrawer extends StatelessWidget {
         ? AppLang.ar
         : AppLang.en;
     final statsText = T.of(lang, 'statistics');
-    final bankText = T.of(lang, 'bank');
     final dailyText = T.of(lang, 'dailySales');
     // optionally: final settingsText = lang == AppLang.ar ? 'الإعدادات' : 'Settings';
     return Drawer(
@@ -27,7 +27,7 @@ class AppDrawer extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
             ),
             child: const Text(
-              'Shop Manager',
+              'Sweet Sip',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -47,13 +47,13 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.inventory_2),
-            title: Text(bankText),
+            leading: const Icon(Icons.people_alt_outlined),
+            title: Text(lang == AppLang.ar ? 'طلبات الموظفين' : 'Staff Orders'),
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const BankScreen()),
+                MaterialPageRoute(builder: (_) => const OwnerOrdersScreen()),
               );
             },
           ),
@@ -65,6 +65,21 @@ class AppDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const DailySalesScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.auto_awesome_outlined),
+            title: Text(
+              lang == AppLang.ar ? 'الاقتراحات الذكية' : 'Smart Suggestions',
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SmartSuggestionsScreen(),
+                ),
               );
             },
           ),

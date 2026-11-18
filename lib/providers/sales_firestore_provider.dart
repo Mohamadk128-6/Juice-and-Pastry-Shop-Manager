@@ -48,6 +48,8 @@ class SalesFirestoreProvider extends ChangeNotifier {
           items: items,
           createdAt: created,
           exchangeRate: exchangeRate,
+          workerName: (data['workerName'] ?? 'غير محدد').toString(),
+          orderNote: (data['orderNote'] ?? '').toString(),
         ));
       }
       notifyListeners();
@@ -63,6 +65,21 @@ class SalesFirestoreProvider extends ChangeNotifier {
     final copy = [..._transactions];
     return copy.take(20).toList();
   }
+
+  List<String> get workerNames {
+    final names = _transactions
+        .map((transaction) => transaction.workerName)
+        .where((name) => name.isNotEmpty && name != 'غير محدد')
+        .toSet()
+        .toList();
+    names.sort();
+    return names;
+  }
+
+  List<SaleTransaction> transactionsForWorker(String workerName) =>
+      _transactions
+          .where((transaction) => transaction.workerName == workerName)
+          .toList(growable: false);
 
   double get totalUsdAll =>
       allSales.fold(0.0, (total, sale) => total + sale.totalUsd);
@@ -83,11 +100,17 @@ class SalesFirestoreProvider extends ChangeNotifier {
         .fold(0.0, (total, sale) => total + sale.totalUsd);
   }
 
-  Future<void> addTransaction(
-      {required List<Sale> items, required double exchangeRate}) async {
+  Future<void> addTransaction({
+    required List<Sale> items,
+    required double exchangeRate,
+    required String workerName,
+    String orderNote = '',
+  }) async {
     final doc = {
       'createdAt': FieldValue.serverTimestamp(),
       'exchangeRate': exchangeRate,
+      'workerName': workerName.trim(),
+      'orderNote': orderNote.trim(),
       'items': items
           .map((s) => {
                 'id': s.id,

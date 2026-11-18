@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
+
+# Local Firebase and Flutter tooling configuration
+/android/app/google-services.json
+/devtools_options.yaml
